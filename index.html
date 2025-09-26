@@ -6,16 +6,13 @@
   <title>KWE Recruit Machine Dashboard</title>
   <style>
     :root{
-      --bg:#0b0b0f;--panel:#14141a;--muted:#1c1c24;--text:#e7e7ea;--sub:#a7a7ad;
-      --ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--accent:#C70000;--line:#2a2a33;
-      --pill:#0f1117;--pillEdge:#2a2f3a;
+      --bg:#0b0b0f;--panel:#14141a;--muted:#1c1c24;--text:#e7e7ea;--sub:#a7a7ad;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--accent:#C70000;--line:#2a2a33;--pill:#0f1117;--pillEdge:#2a2f3a;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);
-         font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans","Helvetica Neue",Arial,sans-serif}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans","Helvetica Neue",Arial,sans-serif;overflow:hidden}
     a{color:inherit}
-    .wrap{max-width:1200px;margin:0 auto;padding:18px}
+    .wrap{max-width:none;width:100%;margin:0 auto;padding:16px}
 
     .topbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
     .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px}
@@ -28,14 +25,17 @@
     .btn.small{padding:6px 8px;font-size:12px;border-radius:8px}
     .btn.gray{background:#2b2f3a;border-color:#3a3f4d;color:#e4e6eb}
 
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:14px}
+    @media(min-width:900px){.grid{grid-template-columns: 1fr 360px}}
+
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
     .card h3{margin:0 0 10px 0;font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.6px}
 
     /* STATUS BAR */
     .statusbar{display:flex;gap:12px;flex-wrap:nowrap;overflow:auto;padding:6px 4px}
     .statustab{min-width:160px;background:var(--pill);border:1px solid var(--pillEdge);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer}
     .statustab .label{font-size:12px;color:#c5c7ce;text-transform:uppercase;letter-spacing:.4px}
-    .statustab .count{font-size:22px;font-weight:800}
+    .statustab .count{font-size:22px;font-weight:800;color:var(--accent);text-shadow:0 0 1px rgba(0,0,0,.4)}
     .statustab.active{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:#131720}
 
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
@@ -50,7 +50,7 @@
     thead th{position:sticky;top:0;background:var(--panel);z-index:1}
     th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}
     tbody tr:hover{background:#121219}
-    .tbl{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:12px}
+    .tbl{overflow:auto;max-height:calc(100vh - 320px);border:1px solid var(--line);border-radius:12px}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px;color:#cfcfd6}
     .tag{border:1px solid var(--line);background:var(--muted);border-radius:999px;padding:2px 8px;font-size:12px}
 
@@ -70,24 +70,22 @@
 <body>
   <div class="wrap">
     <div class="topbar">
-      <div class="brand">
-        <!-- Put your logo file in the repo and point to it here -->
-        <img class="logo" src="kw-explore-logo.png" alt="KW Explore" onerror="this.style.display='none'">
-        KWE Recruit Machine
-      </div>
+      <div class="brand"><img class="logo" src="data:image/png;base64,1paajTW5gsyxqRlARERJcl5pcskoYAgXQWy4oqIyES4WG3o6OiYqHXvk1EyBoiM9...v8N+v7/N7XbvpjRamipkGIZhGIZhmEzg/wEwKr+Qx3M8MAAAAABJRU5ErkJggg==" alt="KW Explore" style="display:block" onerror="this.style.display='none'"> KWE Recruit Machine</div>
       <div class="controls">
         <button class="btn" id="refreshBtn" title="Refresh data">⟳ Refresh</button>
         <button class="btn" id="prepareBtn" title="Clear WA columns">Prepare</button>
         <button class="btn" id="rerunBtn" title="Rebuild WhatsApp links/messages">Re-run</button>
-        <button class="btn" id="fixBtn" title="Fix dropdowns">Fix Dropdowns</button>
+        <button class="btn" id="fixBtn" title="Fix dropdowns & clean statuses">Fix Dropdowns</button>
         <a class="btn ghost" id="openSheetBtn" target="_blank" rel="noopener">Open Sheet</a>
       </div>
     </div>
 
+    <!-- TOP CARD: Status row + Filters/Bulk row -->
     <div class="card" id="pipelineCard">
       <div class="statusbar" id="statusTabs"></div>
 
       <div class="row between" style="margin-top:12px">
+        <!-- Filters (left) -->
         <div class="col">
           <h3>Filters</h3>
           <div class="filters">
@@ -96,6 +94,7 @@
             <button id="resetFilters" class="btn gray">Reset</button>
           </div>
         </div>
+        <!-- Bulk (right) -->
         <div class="col">
           <h3>Bulk Actions</h3>
           <div class="row">
@@ -106,15 +105,13 @@
         </div>
       </div>
 
-      <div class="muted" style="margin-top:10px">
-        Click a status block to filter. Your selection stays active while you update rows.
-        Notes save with the <strong>Save</strong> button per row.
-      </div>
+      <div class="muted" style="margin-top:10px">Click a status block to filter. Your selection stays active while you update rows. Notes save with the <strong>Save</strong> button per row.</div>
     </div>
 
-    <div class="card">
+    <!-- TABLE CARD -->
+    <div class="card" style="margin-top:12px">
       <h3>Recruits</h3>
-      <div class="tbl">
+      <div class="tbl" id="tableWrap">
         <table id="tbl">
           <thead>
             <tr>
@@ -143,20 +140,18 @@
     const API_URL = 'https://script.google.com/macros/s/AKfycbzjX67akOv2uPloX312lsO57-ZvVyMR7Yup74cLS58nbZkoPI7ZwvosZkcV9WhwsWNXuw/exec';
     const SHEET_URL_HINT = 'https://docs.google.com/spreadsheets/d/1ZahEKgePHz8peSeU0wq8UbzP-aGfmENR1HIfOdpeFHI/edit?gid=0#gid=0';
     const STATUS_OPTIONS = [
-      'To Contact','Whatsapp Sent','No Whatsapp','Replied',
-      'Not Interested in KW','Invite to Events/ Networking','Appointment',
-      'Ready to join KW','JOINED'
+      'To Contact','Whatsapp Sent','No Whatsapp','Replied','Not Interested in KW','Invite to Events/ Networking','Appointment','Ready to join KW','JOINED'
     ];
-    const LISTING_TYPE_OPTIONS = ['On Show','New Listing','Rental','Other'];
 
-    // Merge base statuses with any statuses already present so we never “lose” a value
+    // Merge base statuses with any statuses already present in the sheet so we never "lose" a value
     function getStatusOptions(){
       const base = STATUS_OPTIONS.slice();
       const extras = Array.from(new Set(rows.map(r=>r.status).filter(s=>s && !base.includes(s))));
       return base.concat(extras);
     }
+    const LISTING_TYPE_OPTIONS = ['On Show','New Listing','Rental','Other'];
 
-    // Normalize status variants (e.g., "joined" -> "JOINED")
+    // Normalize status strings coming from the sheet (case/spacing variants)
     function normalizeStatus(s){
       const x = String(s||'').trim().toLowerCase();
       const map = {
@@ -176,7 +171,7 @@
     // === STATE ===
     let rows = [];        // full dataset objects (header excluded)
     let filtered = [];    // filtered view
-    let statusCounts = {};
+    let statusCounts = {}; 
     let selectedStatus = localStorage.getItem('fltStatus') || '';
     let selectedAgency = localStorage.getItem('fltAgency') || '';
 
@@ -190,7 +185,7 @@
 
     function buildRowObject(arr, idx){
       return {
-        originalIndex: idx, // 0-based (sheet row = idx + 2)
+        originalIndex: idx, // 0-based for data rows (sheet row = idx + 2)
         listingType: arr[0]||'',
         listingRef: arr[1]||'',
         name: arr[2]||'',
@@ -225,6 +220,7 @@
     }
 
     function renderStatusTabs(){
+      // Global counts above filters
       computeStats();
       const bar = $('#statusTabs');
       bar.innerHTML = '';
@@ -246,7 +242,7 @@
 
       // Total first (global, not affected by filters)
       bar.appendChild(makeTab('', 'Total', rows.length));
-      for(const st of STATUS_OPTIONS){ bar.appendChild(makeTab(st, st, statusCounts[st]||0)); }
+      for(const st of STATUS_OPTIONS){ const c = statusCounts[st]||0; bar.appendChild(makeTab(st, st, c)); }
       markActiveStatusTabs();
     }
 
@@ -260,17 +256,15 @@
     function unique(list){ return Array.from(new Set(list.filter(Boolean))).sort((a,b)=>a.localeCompare(b)); }
 
     function populateFilters(){
-      const stSel = $('#fltStatus');
-      stSel.innerHTML = '<option value="">Status (all)</option>' + getStatusOptions().map(s=>`<option>${s}</option>`).join('');
+      // Status dropdown
+      const stSel = $('#fltStatus'); stSel.innerHTML = '<option value="">Status (all)</option>' + getStatusOptions().map(s=>`<option>${s}</option>`).join('');
       stSel.value = selectedStatus;
-
+      // Agency dropdown from data
       const agencies = unique(rows.map(r=>r.agency));
-      const agSel = $('#fltAgency');
-      agSel.innerHTML = '<option value="">Agency (all)</option>' + agencies.map(a=>`<option>${escapeHtml(a)}</option>`).join('');
+      const agSel = $('#fltAgency'); agSel.innerHTML = '<option value="">Agency (all)</option>' + agencies.map(a=>`<option>${escapeHtml(a)}</option>`).join('');
       agSel.value = selectedAgency;
-
-      const bulk = $('#bulkStatus');
-      bulk.innerHTML = '<option value="">Set Status to...</option>' + getStatusOptions().map(s=>`<option>${s}</option>`).join('');
+      // Bulk select
+      const bulk = $('#bulkStatus'); bulk.innerHTML = '<option value="">Set Status to...</option>' + getStatusOptions().map(s=>`<option>${s}</option>`).join('');
     }
 
     function applyFilters(){
@@ -288,15 +282,19 @@
       for(const r of filtered){
         const tr = document.createElement('tr');
 
+        // checkbox
         const tdSel = document.createElement('td');
         const cb = document.createElement('input'); cb.type='checkbox'; cb.dataset.idx = r.originalIndex; tdSel.appendChild(cb); tr.appendChild(tdSel);
 
+        // Listing Type
         const tdType = document.createElement('td'); tdType.innerHTML = `<span class="tag">${escapeHtml(r.listingType||'')}</span>`; tr.appendChild(tdType);
 
+        // WhatsApp Link
         const tdWA = document.createElement('td');
         if(r.waLink){ const a=document.createElement('a'); a.className='link'; a.href=r.waLink; a.target='_blank'; a.rel='noopener'; a.textContent='Open'; tdWA.appendChild(a); }
         tr.appendChild(tdWA);
 
+        // Status (editable)
         const tdStatus = document.createElement('td');
         const sel = makeSelect(getStatusOptions(), r.status||'');
         sel.onchange = async (ev)=>{
@@ -306,16 +304,24 @@
             await apiPost('updateSingleStatus', { rowIndex: r.originalIndex, newStatus });
             r.status = newStatus; r.lastContact = new Date().toISOString();
             toast('Status updated');
-            renderStatusTabs();
+            renderStatusTabs(); // refresh counts but keep active selection
           }catch(e){ console.error(e); toast('Failed to update status', 2800); }
           finally{ lockRow(tr,false); }
         };
         tdStatus.appendChild(sel); tr.appendChild(tdStatus);
 
-        const tdName = document.createElement('td'); tdName.textContent = r.name || ''; tr.appendChild(tdName);
-        const tdSurname = document.createElement('td'); tdSurname.textContent = r.surname || ''; tr.appendChild(tdSurname);
+        // Name
+        const tdName = document.createElement('td');
+        tdName.textContent = r.name || ''; tr.appendChild(tdName);
+
+        // Surname
+        const tdSurname = document.createElement('td');
+        tdSurname.textContent = r.surname || ''; tr.appendChild(tdSurname);
+
+        // Contact Number
         const tdPhone = document.createElement('td'); tdPhone.textContent = r.phone || ''; tr.appendChild(tdPhone);
 
+        // Notes (editable)
         const tdNotes = document.createElement('td');
         const ta = document.createElement('textarea'); ta.className='input note'; ta.value = r.notes||''; tdNotes.appendChild(ta);
         const save = document.createElement('button'); save.className='btn small'; save.textContent='Save'; save.onclick = async ()=>{
@@ -325,7 +331,10 @@
         };
         tdNotes.appendChild(save); tr.appendChild(tdNotes);
 
+        // Agency
         const tdAgency = document.createElement('td'); tdAgency.textContent = r.agency || ''; tr.appendChild(tdAgency);
+
+        // Suburb
         const tdSuburb = document.createElement('td'); tdSuburb.textContent = r.suburb || ''; tr.appendChild(tdSuburb);
 
         tb.appendChild(tr);
@@ -348,27 +357,48 @@
         populateFilters();
         renderStatusTabs();
         applyFilters();
+        adjustTableHeight();
         $('#openSheetBtn').href = SHEET_URL_HINT;
-      } catch(e){
-        console.error(e);
-        toast('Load failed: ' + e.message, 3200);
-        $('#tbody').innerHTML = '<tr><td colspan="10" class="danger">Failed to load. Check access to Apps Script web app.</td></tr>';
-      }
+      } catch(e){ console.error(e); toast('Load failed: ' + e.message, 3200); $('#tbody').innerHTML = '<tr><td colspan="10" class="danger">Failed to load. Check CORS / deployment access.</td></tr>'; }
     }
 
+    function adjustTableHeight(){
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const topbar = document.querySelector('.topbar');
+      const pipeline = document.getElementById('pipelineCard');
+      const tableWrap = document.getElementById('tableWrap');
+      if(!tableWrap) return;
+      const padding = 32; // wrap padding/margins
+      const topH = (topbar?.offsetHeight||0) + (pipeline?.offsetHeight||0) + padding;
+      const maxH = Math.max(240, vh - topH - 24);
+      tableWrap.style.maxHeight = maxH + 'px';
+    }
+
+    // === EVENTS ===
     document.addEventListener('DOMContentLoaded', ()=>{
-      $('#fltStatus').addEventListener('change', ()=>{ selectedStatus = $('#fltStatus').value; localStorage.setItem('fltStatus', selectedStatus); markActiveStatusTabs(); applyFilters(); });
-      $('#fltAgency').addEventListener('change', ()=>{ selectedAgency = $('#fltAgency').value; localStorage.setItem('fltAgency', selectedAgency); applyFilters(); });
-      $('#resetFilters').addEventListener('click', ()=>{ selectedStatus=''; selectedAgency=''; localStorage.setItem('fltStatus',''); localStorage.setItem('fltAgency',''); $('#fltStatus').value=''; $('#fltAgency').value=''; markActiveStatusTabs(); applyFilters(); });
+      $('#fltStatus').addEventListener('change', ()=>{ selectedStatus = $('#fltStatus').value; localStorage.setItem('fltStatus', selectedStatus); markActiveStatusTabs(); applyFilters(); adjustTableHeight(); });
+      $('#fltAgency').addEventListener('change', ()=>{ selectedAgency = $('#fltAgency').value; localStorage.setItem('fltAgency', selectedAgency); applyFilters(); adjustTableHeight(); });
+      $('#resetFilters').addEventListener('click', ()=>{ selectedStatus=''; selectedAgency=''; localStorage.setItem('fltStatus',''); localStorage.setItem('fltAgency',''); $('#fltStatus').value=''; $('#fltAgency').value=''; markActiveStatusTabs(); applyFilters(); adjustTableHeight(); });
 
       $('#checkAll').addEventListener('change', (e)=>{ $$('#tbody input[type="checkbox"]').forEach(cb=>cb.checked=e.target.checked); });
       $('#clearChecks').addEventListener('click', ()=>{ $$('#tbody input[type="checkbox"]').forEach(cb=>cb.checked=false); $('#checkAll').checked=false; });
       $('#applyBulk').addEventListener('click', async ()=>{
         const idxs = selectedIndices(); const st = $('#bulkStatus').value; if(!idxs.length) return toast('Select some rows'); if(!st) return toast('Choose a bulk status');
-        try{ await apiPost('bulkUpdateStatus', { rowIndices: idxs, newStatus: st }); toast('Bulk update complete'); await load(); }
+        try{ await apiPost('bulkUpdateStatus', { rowIndices: idxs, newStatus: st }); toast('Bulk update complete'); await load(); adjustTableHeight(); }
         catch(e){ console.error(e); toast('Bulk update failed', 3000); }
       });
 
+      $('#refreshBtn').addEventListener('click', ()=>{ load(); });
+      $('#prepareBtn').addEventListener('click', async ()=>{ try{ await apiPost('prepareSheet',{}); toast('Prepared'); load(); }catch(e){ toast('Prepare failed'); }});
+      $('#rerunBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('rerunAutomations',{}); toast(r.message||'Re-run complete'); load(); }catch(e){ toast('Re-run failed'); }});
+      $('#fixBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('fixDataValidation',{}); toast(r.message||'Fixed'); load(); }catch(e){ toast('Fix failed'); }});
+
+      window.addEventListener('resize', adjustTableHeight);
+      load();
+      adjustTableHeight();
+    });
+
+      // Utilities
       $('#refreshBtn').addEventListener('click', load);
       $('#prepareBtn').addEventListener('click', async ()=>{ try{ await apiPost('prepareSheet',{}); toast('Prepared'); load(); }catch(e){ toast('Prepare failed'); }});
       $('#rerunBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('rerunAutomations',{}); toast(r.message||'Re-run complete'); load(); }catch(e){ toast('Re-run failed'); }});
