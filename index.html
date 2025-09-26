@@ -1,81 +1,398 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KWE Recruit Machine Dashboard</title>
+  <style>
+    :root{
+      --bg:#0b0b0f;--panel:#14141a;--muted:#1c1c24;--text:#e7e7ea;--sub:#a7a7ad;
+      --ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--accent:#C70000;--line:#2a2a33;
+      --pill:#0f1117;--pillEdge:#2a2f3a;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;background:var(--bg);color:var(--text);
+      font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans","Helvetica Neue",Arial,sans-serif;
+      overflow:hidden; /* page doesn't scroll; table scrolls */
+    }
+    a{color:inherit}
+    .wrap{max-width:none;width:100%;margin:0 auto;padding:16px}
 
-// Agency
-const tdAgency = document.createElement('td'); tdAgency.textContent = r.agency || ''; tr.appendChild(tdAgency);
+    .topbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px}
+    .brand img.logo{height:34px;width:auto;display:block;filter:drop-shadow(0 1px 0 rgba(0,0,0,.3));}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{background:var(--muted);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:10px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+    .btn:hover{background:#20202a}
+    .btn.ghost{background:transparent;border-color:var(--line)}
+    .btn.primary{background:var(--accent);border-color:#a10000}
+    .btn.small{padding:6px 8px;font-size:12px;border-radius:8px}
+    .btn.gray{background:#2b2f3a;border-color:#3a3f4d;color:#e4e6eb}
 
-// Suburb
-const tdSuburb = document.createElement('td'); tdSuburb.textContent = r.suburb || ''; tr.appendChild(tdSuburb);
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
+    .card h3{margin:0 0 10px 0;font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.6px}
 
-tb.appendChild(tr);
-}
-$('#checkAll').checked = false;
-}
+    /* STATUS BAR */
+    .statusbar{display:flex;gap:12px;flex-wrap:nowrap;overflow:auto;padding:6px 4px}
+    .statustab{min-width:160px;background:var(--pill);border:1px solid var(--pillEdge);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer}
+    .statustab .label{font-size:12px;color:#c5c7ce;text-transform:uppercase;letter-spacing:.4px}
+    .statustab .count{font-size:22px;font-weight:800;color:var(--accent);text-shadow:0 0 1px rgba(0,0,0,.4)}
+    .statustab.active{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:#131720}
 
-function selectedIndices(){ return $$('#tbody input[type="checkbox"]:checked').map(cb=>parseInt(cb.dataset.idx,10)); }
-function lockRow(tr, lock){ tr.style.opacity = lock? .6 : 1; }
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .between{justify-content:space-between}
+    .col{flex:1 1 420px}
 
-async function load(){
-$('#tbody').innerHTML = '<tr><td colspan="10">Loading…</td></tr>';
-try{
-const j = await apiGet();
-if(j.result!=='success') throw new Error(j.message||'Unknown error');
-const data = j.data||[];
-if(!data.length){ rows=[]; filtered=[]; renderStatusTabs(); renderTable(); return; }
-const dataRows = data.slice(1); // drop header
-rows = dataRows.map((r,i)=>buildRowObject(r,i));
-populateFilters();
-renderStatusTabs();
-applyFilters();
-adjustTableHeight();
-$('#openSheetBtn').href = SHEET_URL_HINT;
-} catch(e){ console.error(e); toast('Load failed: ' + e.message, 3200); $('#tbody').innerHTML = '<tr><td colspan="10" class="danger">Failed to load. Check CORS / deployment access.</td></tr>'; }
-}
+    .filters{display:flex;gap:8px;flex-wrap:wrap}
+    .input,.select{background:#111117;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;outline:none}
+    .input:focus,.select:focus{border-color:#3a3a46}
 
-function adjustTableHeight(){
-const vh = window.innerHeight || document.documentElement.clientHeight;
-const topbar = document.querySelector('.topbar');
-const pipeline = document.getElementById('pipelineCard');
-const tableWrap = document.getElementById('tableWrap');
-if(!tableWrap) return;
-const padding = 32; // wrap padding/margins
-const topH = (topbar?.offsetHeight||0) + (pipeline?.offsetHeight||0) + padding;
-const maxH = Math.max(240, vh - topH - 24);
-tableWrap.style.maxHeight = maxH + 'px';
-}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    thead th{position:sticky;top:0;background:var(--panel);z-index:1}
+    th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}
+    tbody tr:hover{background:#121219}
+    .tbl{overflow:auto;border:1px solid var(--line);border-radius:12px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px;color:#cfcfd6}
+    .tag{border:1px solid var(--line);background:var(--muted);border-radius:999px;padding:2px 8px;font-size:12px}
 
-// === EVENTS ===
-document.addEventListener('DOMContentLoaded', ()=>{
-$('#fltStatus').addEventListener('change', ()=>{ selectedStatus = $('#fltStatus').value; localStorage.setItem('fltStatus', selectedStatus); markActiveStatusTabs(); applyFilters(); adjustTableHeight(); });
-$('#fltAgency').addEventListener('change', ()=>{ selectedAgency = $('#fltAgency').value; localStorage.setItem('fltAgency', selectedAgency); applyFilters(); adjustTableHeight(); });
-$('#resetFilters').addEventListener('click', ()=>{ selectedStatus=''; selectedAgency=''; localStorage.setItem('fltStatus',''); localStorage.setItem('fltAgency',''); $('#fltStatus').value=''; $('#fltAgency').value=''; markActiveStatusTabs(); applyFilters(); adjustTableHeight(); });
+    .note{width:260px;min-height:34px;max-height:100px;resize:vertical}
+    .status-select{min-width:160px}
 
-$('#checkAll').addEventListener('change', (e)=>{ $$('#tbody input[type="checkbox"]').forEach(cb=>cb.checked=e.target.checked); });
-$('#clearChecks').addEventListener('click', ()=>{ $$('#tbody input[type="checkbox"]').forEach(cb=>cb.checked=false); $('#checkAll').checked=false; });
-$('#applyBulk').addEventListener('click', async ()=>{
-const idxs = selectedIndices(); const st = $('#bulkStatus').value; if(!idxs.length) return toast('Select some rows'); if(!st) return toast('Choose a bulk status');
-try{ await apiPost('bulkUpdateStatus', { rowIndices: idxs, newStatus: st }); toast('Bulk update complete'); await load(); adjustTableHeight(); }
-catch(e){ console.error(e); toast('Bulk update failed', 3000); }
-});
+    .toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;border:1px solid #333;border-radius:10px;padding:10px 12px;opacity:.98}
+    .hidden{display:none}
 
-$('#refreshBtn').addEventListener('click', ()=>{ load(); });
-$('#prepareBtn').addEventListener('click', async ()=>{ try{ await apiPost('prepareSheet',{}); toast('Prepared'); load(); }catch(e){ toast('Prepare failed'); }});
-$('#rerunBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('rerunAutomations',{}); toast(r.message||'Re-run complete'); load(); }catch(e){ toast('Re-run failed'); }});
-$('#fixBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('fixDataValidation',{}); toast(r.message||'Fixed'); load(); }catch(e){ toast('Fix failed'); }});
+    .wa{display:inline-flex;align-items:center;gap:6px}
+    .link{border:1px solid var(--line);background:transparent;color:#9cdcfe;padding:4px 8px;border-radius:8px;text-decoration:none}
 
-window.addEventListener('resize', adjustTableHeight);
-load();
-adjustTableHeight();
-});
+    .muted{color:var(--sub)}
+    .danger{color:var(--err)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <!-- If you want the embedded logo, replace src with a data-URI or your PNG path -->
+        <img class="logo" src="kw-explore-logo.png" alt="KW Explore" onerror="this.style.display='none'">
+        KWE Recruit Machine
+      </div>
+      <div class="controls">
+        <button class="btn" id="refreshBtn" title="Refresh data">⟳ Refresh</button>
+        <button class="btn" id="prepareBtn" title="Clear WA columns">Prepare</button>
+        <button class="btn" id="rerunBtn" title="Rebuild WhatsApp links/messages">Re-run</button>
+        <button class="btn" id="fixBtn" title="Fix dropdowns">Fix Dropdowns</button>
+        <a class="btn ghost" id="openSheetBtn" target="_blank" rel="noopener">Open Sheet</a>
+      </div>
+    </div>
 
-// Utilities
-$('#refreshBtn').addEventListener('click', load);
-$('#prepareBtn').addEventListener('click', async ()=>{ try{ await apiPost('prepareSheet',{}); toast('Prepared'); load(); }catch(e){ toast('Prepare failed'); }});
-$('#rerunBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('rerunAutomations',{}); toast(r.message||'Re-run complete'); load(); }catch(e){ toast('Re-run failed'); }});
-$('#fixBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('fixDataValidation',{}); toast(r.message||'Fixed'); load(); }catch(e){ toast('Fix failed'); }});
+    <div class="card" id="pipelineCard">
+      <div class="statusbar" id="statusTabs"></div>
 
-load();
-});
-</script>
+      <div class="row between" style="margin-top:12px">
+        <div class="col">
+          <h3>Filters</h3>
+          <div class="filters">
+            <select id="fltAgency" class="select"><option value="">Agency (all)</option></select>
+            <select id="fltStatus" class="select"><option value="">Status (all)</option></select>
+            <button id="resetFilters" class="btn gray">Reset</button>
+          </div>
+        </div>
+        <div class="col">
+          <h3>Bulk Actions</h3>
+          <div class="row">
+            <select id="bulkStatus" class="select status-select"><option value="">Set Status to...</option></select>
+            <button id="applyBulk" class="btn primary">Apply</button>
+            <button id="clearChecks" class="btn gray">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="muted" style="margin-top:10px">
+        Click a status block to filter. Your selection stays active while you update rows.
+        Notes save with the <strong>Save</strong> button per row.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Recruits</h3>
+      <div class="tbl" id="tableWrap">
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th style="width:28px"><input type="checkbox" id="checkAll" /></th>
+              <th>Listing Type</th>
+              <th>WhatsApp Link</th>
+              <th>Status</th>
+              <th>Name</th>
+              <th>Surname</th>
+              <th>Contact Number</th>
+              <th>Notes</th>
+              <th>Agency</th>
+              <th>Suburb</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    // === CONFIG ===
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzjX67akOv2uPloX312lsO57-ZvVyMR7Yup74cLS58nbZkoPI7ZwvosZkcV9WhwsWNXuw/exec';
+    const SHEET_URL_HINT = 'https://docs.google.com/spreadsheets/d/1ZahEKgePHz8peSeU0wq8UbzP-aGfmENR1HIfOdpeFHI/edit?gid=0#gid=0';
+    const STATUS_OPTIONS = [
+      'To Contact','Whatsapp Sent','No Whatsapp','Replied',
+      'Not Interested in KW','Invite to Events/ Networking','Appointment',
+      'Ready to join KW','JOINED'
+    ];
+    const LISTING_TYPE_OPTIONS = ['On Show','New Listing','Rental','Other'];
+
+    // Merge base statuses with any statuses already present so we never “lose” a value
+    function getStatusOptions(){
+      const base = STATUS_OPTIONS.slice();
+      const extras = Array.from(new Set(rows.map(r=>r.status).filter(s=>s && !base.includes(s))));
+      return base.concat(extras);
+    }
+
+    // Normalize status variants (e.g., "joined" -> "JOINED")
+    function normalizeStatus(s){
+      const x = String(s||'').trim().toLowerCase();
+      const map = {
+        'to contact':'To Contact',
+        'whatsapp sent':'Whatsapp Sent',
+        'no whatsapp':'No Whatsapp',
+        'replied':'Replied',
+        'not interested in kw':'Not Interested in KW',
+        'invite to events/ networking':'Invite to Events/ Networking',
+        'appointment':'Appointment',
+        'ready to join kw':'Ready to join KW',
+        'joined':'JOINED'
+      };
+      return map[x] || s;
+    }
+
+    // === STATE ===
+    let rows = [];        // full dataset objects (header excluded)
+    let filtered = [];    // filtered view
+    let statusCounts = {};
+    let selectedStatus = localStorage.getItem('fltStatus') || '';
+    let selectedAgency = localStorage.getItem('fltAgency') || '';
+
+    // === HELPERS ===
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+    function toast(msg, ms=2200){ const el = $('#toast'); el.textContent = msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'), ms); }
+    function fmtDate(v){ if(!v) return ''; const d = new Date(v); if(Number.isNaN(d.getTime())) return String(v); return d.toLocaleString(); }
+    function makeSelect(opts, value){ const s = document.createElement('select'); s.className='select status-select'; opts.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; if(o===value) op.selected=true; s.appendChild(op);}); return s; }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+    function buildRowObject(arr, idx){
+      return {
+        originalIndex: idx, // 0-based (sheet row = idx + 2)
+        listingType: arr[0]||'',
+        listingRef: arr[1]||'',
+        name: arr[2]||'',
+        surname: arr[3]||'',
+        phone: arr[4]||'',
+        email: arr[5]||'',
+        suburb: arr[6]||'',
+        agency: arr[7]||'',
+        status: normalizeStatus(arr[8]||''),
+        lastContact: arr[9]||'',
+        notes: arr[10]||'',
+        waLink: arr[11]||'',
+        waMessage: arr[12]||'',
+        contactId: arr[13]||''
+      };
+    }
+
+    async function apiGet(){
+      const res = await fetch(API_URL + '?t=' + Date.now());
+      if(!res.ok) throw new Error('GET failed: ' + res.status);
+      return res.json();
+    }
+    async function apiPost(action, payload={}){
+      const res = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action, payload}) });
+      if(!res.ok) throw new Error('POST failed: ' + res.status);
+      return res.json();
+    }
+
+    function computeStats(){
+      statusCounts = {};
+      for(const r of rows){ const k = r.status || '—'; statusCounts[k] = (statusCounts[k]||0)+1; }
+    }
+
+    function renderStatusTabs(){
+      computeStats();
+      const bar = $('#statusTabs');
+      bar.innerHTML = '';
+
+      function makeTab(key,label,count){
+        const b = document.createElement('button');
+        b.className = 'statustab';
+        b.dataset.key = key;
+        b.innerHTML = `<span class="count">${count}</span><span class="label">${escapeHtml(label)}</span>`;
+        b.onclick = ()=>{
+          selectedStatus = key; // '' means All
+          $('#fltStatus').value = selectedStatus;
+          localStorage.setItem('fltStatus', selectedStatus);
+          applyFilters();
+          markActiveStatusTabs();
+        };
+        return b;
+      }
+
+      bar.appendChild(makeTab('', 'Total', rows.length));
+      for(const st of STATUS_OPTIONS){ bar.appendChild(makeTab(st, st, statusCounts[st]||0)); }
+      markActiveStatusTabs();
+    }
+
+    function markActiveStatusTabs(){
+      $$('.statustab').forEach(btn=>{
+        if(btn.dataset.key === (selectedStatus||'')) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+    }
+
+    function unique(list){ return Array.from(new Set(list.filter(Boolean))).sort((a,b)=>a.localeCompare(b)); }
+
+    function populateFilters(){
+      const stSel = $('#fltStatus');
+      stSel.innerHTML = '<option value="">Status (all)</option>' + getStatusOptions().map(s=>`<option>${s}</option>`).join('');
+      stSel.value = selectedStatus;
+
+      const agencies = unique(rows.map(r=>r.agency));
+      const agSel = $('#fltAgency');
+      agSel.innerHTML = '<option value="">Agency (all)</option>' + agencies.map(a=>`<option>${escapeHtml(a)}</option>`).join('');
+      agSel.value = selectedAgency;
+
+      const bulk = $('#bulkStatus');
+      bulk.innerHTML = '<option value="">Set Status to...</option>' + getStatusOptions().map(s=>`<option>${s}</option>`).join('');
+    }
+
+    function applyFilters(){
+      filtered = rows.filter(r => {
+        const okStatus = !selectedStatus || r.status===selectedStatus;
+        const okAgency = !selectedAgency || r.agency===selectedAgency;
+        return okStatus && okAgency;
+      });
+      renderTable();
+      adjustTableHeight();
+    }
+
+    function renderTable(){
+      const tb = $('#tbody');
+      tb.innerHTML = '';
+      for(const r of filtered){
+        const tr = document.createElement('tr');
+
+        const tdSel = document.createElement('td');
+        const cb = document.createElement('input'); cb.type='checkbox'; cb.dataset.idx = r.originalIndex; tdSel.appendChild(cb); tr.appendChild(tdSel);
+
+        const tdType = document.createElement('td'); tdType.innerHTML = `<span class="tag">${escapeHtml(r.listingType||'')}</span>`; tr.appendChild(tdType);
+
+        const tdWA = document.createElement('td');
+        if(r.waLink){ const a=document.createElement('a'); a.className='link'; a.href=r.waLink; a.target='_blank'; a.rel='noopener'; a.textContent='Open'; tdWA.appendChild(a); }
+        tr.appendChild(tdWA);
+
+        const tdStatus = document.createElement('td');
+        const sel = makeSelect(getStatusOptions(), r.status||'');
+        sel.onchange = async (ev)=>{
+          const newStatus = ev.target.value;
+          try{
+            lockRow(tr,true);
+            await apiPost('updateSingleStatus', { rowIndex: r.originalIndex, newStatus });
+            r.status = newStatus; r.lastContact = new Date().toISOString();
+            toast('Status updated');
+            renderStatusTabs();
+          }catch(e){ console.error(e); toast('Failed to update status', 2800); }
+          finally{ lockRow(tr,false); }
+        };
+        tdStatus.appendChild(sel); tr.appendChild(tdStatus);
+
+        const tdName = document.createElement('td'); tdName.textContent = r.name || ''; tr.appendChild(tdName);
+        const tdSurname = document.createElement('td'); tdSurname.textContent = r.surname || ''; tr.appendChild(tdSurname);
+        const tdPhone = document.createElement('td'); tdPhone.textContent = r.phone || ''; tr.appendChild(tdPhone);
+
+        const tdNotes = document.createElement('td');
+        const ta = document.createElement('textarea'); ta.className='input note'; ta.value = r.notes||''; tdNotes.appendChild(ta);
+        const save = document.createElement('button'); save.className='btn small'; save.textContent='Save'; save.onclick = async ()=>{
+          try{ lockRow(tr,true); await apiPost('updateSingleNote', { rowIndex: r.originalIndex, newNote: ta.value }); r.notes = ta.value; r.lastContact = new Date().toISOString(); toast('Note saved'); }
+          catch(e){ console.error(e); toast('Failed to save note', 2800); }
+          finally{ lockRow(tr,false); }
+        };
+        tdNotes.appendChild(save); tr.appendChild(tdNotes);
+
+        const tdAgency = document.createElement('td'); tdAgency.textContent = r.agency || ''; tr.appendChild(tdAgency);
+        const tdSuburb = document.createElement('td'); tdSuburb.textContent = r.suburb || ''; tr.appendChild(tdSuburb);
+
+        tb.appendChild(tr);
+      }
+      $('#checkAll').checked = false;
+    }
+
+    function selectedIndices(){ return $$('#tbody input[type="checkbox"]:checked').map(cb=>parseInt(cb.dataset.idx,10)); }
+    function lockRow(tr, lock){ tr.style.opacity = lock? .6 : 1; }
+
+    function adjustTableHeight(){
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const topbar = document.querySelector('.topbar');
+      const pipeline = document.getElementById('pipelineCard');
+      const tableWrap = document.getElementById('tableWrap');
+      if(!tableWrap) return;
+      const padding = 32; // wrap padding/margins
+      const topH = (topbar?.offsetHeight||0) + (pipeline?.offsetHeight||0) + padding;
+      const maxH = Math.max(240, vh - topH - 24);
+      tableWrap.style.maxHeight = maxH + 'px';
+    }
+
+    async function load(){
+      $('#tbody').innerHTML = '<tr><td colspan="10">Loading…</td></tr>';
+      try{
+        const j = await apiGet();
+        if(j.result!=='success') throw new Error(j.message||'Unknown error');
+        const data = j.data||[];
+        if(!data.length){ rows=[]; filtered=[]; renderStatusTabs(); renderTable(); adjustTableHeight(); return; }
+        const dataRows = data.slice(1); // drop header
+        rows = dataRows.map((r,i)=>buildRowObject(r,i));
+        populateFilters();
+        renderStatusTabs();
+        applyFilters();
+        $('#openSheetBtn').href = SHEET_URL_HINT;
+      } catch(e){
+        console.error(e);
+        toast('Load failed: ' + e.message, 3200);
+        $('#tbody').innerHTML = '<tr><td colspan="10" class="danger">Failed to load. Check Apps Script deployment access.</td></tr>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      $('#fltStatus').addEventListener('change', ()=>{ selectedStatus = $('#fltStatus').value; localStorage.setItem('fltStatus', selectedStatus); markActiveStatusTabs(); applyFilters(); });
+      $('#fltAgency').addEventListener('change', ()=>{ selectedAgency = $('#fltAgency').value; localStorage.setItem('fltAgency', selectedAgency); applyFilters(); });
+      $('#resetFilters').addEventListener('click', ()=>{ selectedStatus=''; selectedAgency=''; localStorage.setItem('fltStatus',''); localStorage.setItem('fltAgency',''); $('#fltStatus').value=''; $('#fltAgency').value=''; markActiveStatusTabs(); applyFilters(); });
+
+      $('#checkAll').addEventListener('change', (e)=>{ $$('#tbody input[type="checkbox"]').forEach(cb=>cb.checked=e.target.checked); });
+      $('#clearChecks').addEventListener('click', ()=>{ $$('#tbody input[type="checkbox"]').forEach(cb=>cb.checked=false); $('#checkAll').checked=false; });
+      $('#applyBulk').addEventListener('click', async ()=>{
+        const idxs = selectedIndices(); const st = $('#bulkStatus').value; if(!idxs.length) return toast('Select some rows'); if(!st) return toast('Choose a bulk status');
+        try{ await apiPost('bulkUpdateStatus', { rowIndices: idxs, newStatus: st }); toast('Bulk update complete'); await load(); }
+        catch(e){ console.error(e); toast('Bulk update failed', 3000); }
+      });
+
+      $('#refreshBtn').addEventListener('click', load);
+      $('#prepareBtn').addEventListener('click', async ()=>{ try{ await apiPost('prepareSheet',{}); toast('Prepared'); load(); }catch(e){ toast('Prepare failed'); }});
+      $('#rerunBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('rerunAutomations',{}); toast(r.message||'Re-run complete'); load(); }catch(e){ toast('Re-run failed'); }});
+      $('#fixBtn').addEventListener('click', async ()=>{ try{ const r = await apiPost('fixDataValidation',{}); toast(r.message||'Fixed'); load(); }catch(e){ toast('Fix failed'); }});
+
+      window.addEventListener('resize', adjustTableHeight);
+      load();
+      adjustTableHeight();
+    });
+  </script>
 </body>
 </html>
-
