@@ -15,7 +15,7 @@
     body{
       margin:0;background:var(--bg);color:var(--text);
       font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans","Helvetica Neue",Arial,sans-serif;
-      overflow:hidden; /* page doesn't scroll; table scrolls */
+      overflow:hidden;
     }
     a{color:inherit}
     .wrap{max-width:none;width:100%;margin:0 auto;padding:16px}
@@ -34,7 +34,6 @@
     .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
     .card h3{margin:0 0 10px 0;font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.6px}
 
-    /* STATUS BAR */
     .statusbar{display:flex;gap:12px;flex-wrap:nowrap;overflow:auto;padding:6px 4px}
     .statustab{min-width:160px;background:var(--pill);border:1px solid var(--pillEdge);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer}
     .statustab .label{font-size:12px;color:#c5c7ce;text-transform:uppercase;letter-spacing:.4px}
@@ -69,7 +68,6 @@
   <div class="wrap">
     <div class="topbar">
       <div class="brand">
-        <!-- Put your logo file in the repo and point to it here, or replace with a data-URI -->
         <img class="logo" src="kw-explore-logo.png" alt="KW Explore" onerror="this.style.display='none'">
         KWE Recruit Machine
       </div>
@@ -146,14 +144,11 @@
       'Ready to join KW','JOINED'
     ];
 
-    // Merge base statuses with any statuses already present so we never “lose” a value
     function getStatusOptions(){
       const base = STATUS_OPTIONS.slice();
       const extras = Array.from(new Set(rows.map(r=>r.status).filter(s=>s && !base.includes(s))));
       return base.concat(extras);
     }
-
-    // Normalize status variants (e.g., "joined" -> "JOINED")
     function normalizeStatus(s){
       const x = String(s||'').trim().toLowerCase();
       const map = {
@@ -171,8 +166,8 @@
     }
 
     // === STATE ===
-    let rows = [];        // full dataset objects (header excluded)
-    let filtered = [];    // filtered view
+    let rows = [];
+    let filtered = [];
     let statusCounts = {};
     let selectedStatus = localStorage.getItem('fltStatus') || '';
     let selectedAgency = localStorage.getItem('fltAgency') || '';
@@ -186,7 +181,7 @@
 
     function buildRowObject(arr, idx){
       return {
-        originalIndex: idx, // 0-based (sheet row = idx + 2)
+        originalIndex: idx,
         listingType: arr[0]||'',
         listingRef: arr[1]||'',
         name: arr[2]||'',
@@ -209,8 +204,7 @@
       if(!res.ok) throw new Error('GET failed: ' + res.status);
       return res.json();
     }
-
-    // IMPORTANT: send as text/plain to avoid CORS preflight on Apps Script
+    // CORS-safe POST for Apps Script
     async function apiPost(action, payload = {}) {
       const res = await fetch(API_URL, {
         method: 'POST',
@@ -236,7 +230,6 @@
       computeStats();
       const bar = $('#statusTabs');
       bar.innerHTML = '';
-
       function makeTab(key,label,count){
         const b = document.createElement('button');
         b.className = 'statustab';
@@ -251,19 +244,16 @@
         };
         return b;
       }
-
       bar.appendChild(makeTab('', 'Total', rows.length));
       for(const st of STATUS_OPTIONS){ bar.appendChild(makeTab(st, st, statusCounts[st]||0)); }
       markActiveStatusTabs();
     }
-
     function markActiveStatusTabs(){
       $$('.statustab').forEach(btn=>{
         if(btn.dataset.key === (selectedStatus||'')) btn.classList.add('active');
         else btn.classList.remove('active');
       });
     }
-
     function unique(list){ return Array.from(new Set(list.filter(Boolean))).sort((a,b)=>a.localeCompare(b)); }
 
     function populateFilters(){
@@ -305,18 +295,26 @@
         if(r.waLink){ const a=document.createElement('a'); a.className='link'; a.href=r.waLink; a.target='_blank'; a.rel='noopener'; a.textContent='Open'; tdWA.appendChild(a); }
         tr.appendChild(tdWA);
 
+        // Status (editable) — immediate move between tabs
         const tdStatus = document.createElement('td');
         const sel = makeSelect(getStatusOptions(), r.status||'');
         sel.onchange = async (ev)=>{
           const newStatus = ev.target.value;
+          const oldStatus = r.status;
           try{
             lockRow(tr,true);
             await apiPost('updateSingleStatus', { rowIndex: r.originalIndex, newStatus });
             r.status = newStatus;
+            renderStatusTabs();   // update counts
+            applyFilters();       // re-filter so it disappears/appears as needed
             toast('Status updated');
-            renderStatusTabs();
-          }catch(e){ console.error(e); toast('Failed to update status', 2800); }
-          finally{ lockRow(tr,false); }
+          }catch(e){
+            console.error(e);
+            toast('Failed to update status', 2800);
+            ev.target.value = oldStatus || '';
+          }finally{
+            lockRow(tr,false);
+          }
         };
         tdStatus.appendChild(sel); tr.appendChild(tdStatus);
 
@@ -350,7 +348,7 @@
       const pipeline = document.getElementById('pipelineCard');
       const tableWrap = document.getElementById('tableWrap');
       if(!tableWrap) return;
-      const padding = 32; // wrap padding/margins
+      const padding = 32;
       const topH = (topbar?.offsetHeight||0) + (pipeline?.offsetHeight||0) + padding;
       const maxH = Math.max(240, vh - topH - 24);
       tableWrap.style.maxHeight = maxH + 'px';
@@ -363,7 +361,7 @@
         if(j.result!=='success') throw new Error(j.message||'Unknown error');
         const data = j.data||[];
         if(!data.length){ rows=[]; filtered=[]; renderStatusTabs(); renderTable(); adjustTableHeight(); return; }
-        const dataRows = data.slice(1); // drop header
+        const dataRows = data.slice(1);
         rows = dataRows.map((r,i)=>buildRowObject(r,i));
         populateFilters();
         renderStatusTabs();
