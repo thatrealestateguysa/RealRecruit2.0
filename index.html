@@ -54,17 +54,12 @@
     th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}
     tbody tr:hover{background:#121219}
     .tbl{overflow:auto;border:1px solid var(--line);border-radius:12px}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px;color:#cfcfd6}
-    .tag{border:1px solid var(--line);background:var(--muted);border-radius:999px;padding:2px 8px;font-size:12px}
 
     .note{width:260px;min-height:34px;max-height:100px;resize:vertical}
     .status-select{min-width:160px}
 
     .toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;border:1px solid #333;border-radius:10px;padding:10px 12px;opacity:.98}
     .hidden{display:none}
-
-    .wa{display:inline-flex;align-items:center;gap:6px}
-    .link{border:1px solid var(--line);background:transparent;color:#9cdcfe;padding:4px 8px;border-radius:8px;text-decoration:none}
 
     .muted{color:var(--sub)}
     .danger{color:var(--err)}
@@ -74,7 +69,7 @@
   <div class="wrap">
     <div class="topbar">
       <div class="brand">
-        <!-- If you want the embedded logo, replace src with a data-URI or your PNG path -->
+        <!-- Put your logo file in the repo and point to it here, or replace with a data-URI -->
         <img class="logo" src="kw-explore-logo.png" alt="KW Explore" onerror="this.style.display='none'">
         KWE Recruit Machine
       </div>
@@ -150,7 +145,6 @@
       'Not Interested in KW','Invite to Events/ Networking','Appointment',
       'Ready to join KW','JOINED'
     ];
-    const LISTING_TYPE_OPTIONS = ['On Show','New Listing','Rental','Other'];
 
     // Merge base statuses with any statuses already present so we never “lose” a value
     function getStatusOptions(){
@@ -187,7 +181,6 @@
     const $ = (sel, root=document) => root.querySelector(sel);
     const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
     function toast(msg, ms=2200){ const el = $('#toast'); el.textContent = msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'), ms); }
-    function fmtDate(v){ if(!v) return ''; const d = new Date(v); if(Number.isNaN(d.getTime())) return String(v); return d.toLocaleString(); }
     function makeSelect(opts, value){ const s = document.createElement('select'); s.className='select status-select'; opts.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; if(o===value) op.selected=true; s.appendChild(op);}); return s; }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
 
@@ -212,14 +205,26 @@
     }
 
     async function apiGet(){
-      const res = await fetch(API_URL + '?t=' + Date.now());
+      const res = await fetch(API_URL + '?t=' + Date.now(), { cache:'no-store' });
       if(!res.ok) throw new Error('GET failed: ' + res.status);
       return res.json();
     }
-    async function apiPost(action, payload={}){
-      const res = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action, payload}) });
-      if(!res.ok) throw new Error('POST failed: ' + res.status);
-      return res.json();
+
+    // IMPORTANT: send as text/plain to avoid CORS preflight on Apps Script
+    async function apiPost(action, payload = {}) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, payload }),
+        cache: 'no-store',
+        credentials: 'omit'
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch { throw new Error('Bad response from server: ' + text); }
+      if (data.result !== 'success') throw new Error(data.message || 'Server error');
+      return data;
     }
 
     function computeStats(){
@@ -307,7 +312,7 @@
           try{
             lockRow(tr,true);
             await apiPost('updateSingleStatus', { rowIndex: r.originalIndex, newStatus });
-            r.status = newStatus; r.lastContact = new Date().toISOString();
+            r.status = newStatus;
             toast('Status updated');
             renderStatusTabs();
           }catch(e){ console.error(e); toast('Failed to update status', 2800); }
@@ -322,7 +327,7 @@
         const tdNotes = document.createElement('td');
         const ta = document.createElement('textarea'); ta.className='input note'; ta.value = r.notes||''; tdNotes.appendChild(ta);
         const save = document.createElement('button'); save.className='btn small'; save.textContent='Save'; save.onclick = async ()=>{
-          try{ lockRow(tr,true); await apiPost('updateSingleNote', { rowIndex: r.originalIndex, newNote: ta.value }); r.notes = ta.value; r.lastContact = new Date().toISOString(); toast('Note saved'); }
+          try{ lockRow(tr,true); await apiPost('updateSingleNote', { rowIndex: r.originalIndex, newNote: ta.value }); r.notes = ta.value; toast('Note saved'); }
           catch(e){ console.error(e); toast('Failed to save note', 2800); }
           finally{ lockRow(tr,false); }
         };
